@@ -9,7 +9,10 @@ import (
 	"strconv"
 
 	elastic "gopkg.in/olivere/elastic.v3"
+	"github.com/pborman/uuid"
 )
+
+	
 
 const (
 	INDEX    = "around"
@@ -19,7 +22,8 @@ const (
 	//PROJECT_ID = "around-xxx"
 	//BT_INSTANCE = "around-post"
 	// Needs to update this URL if you deploy it to cloud.
-	ES_URL = "http://34.66.214.34:9200"
+	ES_URL = "http://34.123.64.231:9200"
+	
 )
 
 type Location struct {
@@ -35,6 +39,38 @@ type Post struct {
 }
 
 func main() {
+	// Create a client
+	client, err := elastic.NewClient(elastic.SetURL(ES_URL), elastic.SetSniff(false))
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	// Use the IndexExists service to check if a specified index exists.
+	exists, err := client.IndexExists(INDEX).Do()
+	if err != nil {
+		panic(err)
+	}
+	if !exists {
+		// Create a new index.
+		mapping := `{
+			"mappings":{
+				"post":{
+					"properties":{
+						"location":{
+							"type":"geo_point"
+						}
+					}
+				}
+			}
+		}`
+		_, err := client.CreateIndex(INDEX).Body(mapping).Do()
+		if err != nil {
+			// Handle error
+			panic(err)
+		}
+	}
+
 	fmt.Println("started-service")
 	http.HandleFunc("/post", handlerPost)
 	http.HandleFunc("/search", handlerSearch)
@@ -48,11 +84,41 @@ func handlerPost(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var p Post
 	if err := decoder.Decode(&p); err != nil {
-		panic(err)
-		return
+		   panic(err)
+		   return
 	}
-	fmt.Fprintf(w, "Post received: %s\n", p.Message)
+	id := uuid.New()
+	
+	// Save to ES.
+	saveToES(&p, id)
+
 }
+
+// Save a post to ElasticSearch
+func saveToES(p *Post, id string) {
+  // Create a client
+  es_client, err := elastic.NewClient(elastic.SetURL(ES_URL), elastic.SetSniff(false))
+  if err != nil {
+	  panic(err)
+	  return
+  }
+
+  // Save it to index
+  _, err = es_client.Index().
+	  Index(INDEX).
+	  Type(TYPE).
+	  Id(id).
+	  BodyJson(p).
+	  Refresh(true).
+	  Do()
+  if err != nil {
+	  panic(err)
+	  return
+  }
+
+  fmt.Printf("Post is saved to Index: %s\n", p.Message)
+}
+
 
 func handlerSearch(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received one request for search")
@@ -94,6 +160,7 @@ func handlerSearch(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Query took %d milliseconds\n", searchResult.TookInMillis)
 	// TotalHits is another convenience function that works even when something goes wrong.
 	fmt.Printf("Found a total of %d post\n", searchResult.TotalHits())
+	
 
 	// Each is a convenience function that iterates over hits in a search result.
 	// It makes sure you don't need to check for nil values in the response.
