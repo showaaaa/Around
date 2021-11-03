@@ -29,11 +29,17 @@ const (
 	//PROJECT_ID = "around-xxx"
 	//BT_INSTANCE = "around-post"
 	// Needs to update this URL if you deploy it to cloud.
+<<<<<<< HEAD
 	ES_URL = "http://34.121.37.223:9200"
 	//34.121.37.223
 	//BUCKET_NAME = "post-images-330703"
 
 	BUCKET_NAME = "post-images-22"
+=======
+	ES_URL      = "http://35.224.0.14:9200"
+	BUCKET_NAME = "post-images-22"
+	
+>>>>>>> eda9ff10a1e3aef628a70381a1cfde9b3a4a2239
 )
 
 type Location struct {
